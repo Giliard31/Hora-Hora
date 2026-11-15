@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hora-Hora & Eficiência</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
+        
+        /* Coluna da Hora travada na esquerda ao rolar horizontalmente */
+        .sticky-col-hora {
+            position: sticky;
+            left: 0;
+            z-index: 20;
+        }
+        thead .sticky-col-hora {
+            z-index: 30;
+        }
+        tfoot .sticky-col-hora {
+            z-index: 25;
+        }
+        .sticky-shadow {
+            box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col font-sans overflow-x-hidden text-base font-black">
+
+    <!-- MODAL COMEMORAÇÃO META BATIDA -->
+    <div id="modal-meta-batida" class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border-4 border-emerald-500 transform scale-100 space-y-4">
+            <div class="text-5xl animate-bounce">🏆🎉</div>
+            <h2 class="text-2xl sm:text-3xl font-black text-emerald-600 tracking-wide uppercase">META BATIDA!</h2>
+            <p class="text-sm font-semibold text-slate-700">Parabéns a toda a equipe! O objetivo do dia foi alcançado com sucesso!</p>
+            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                <span class="text-xs font-bold text-emerald-800 uppercase block">Produção Total</span>
+                <span id="modal-meta-valor" class="text-2xl font-black text-emerald-700">0 pares</span>
+            </div>
+            <button onclick="fecharModalMetaBatida()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm shadow-lg transition">
+                Continuar 🚀
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL NOTIFICAÇÃO GERAL -->
+    <div id="modal-aviso" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-xs w-full p-5 text-center shadow-xl border border-slate-200 space-y-3">
+            <p id="modal-aviso-texto" class="text-sm font-bold text-slate-800"></p>
+            <button onclick="document.getElementById('modal-aviso').classList.add('hidden')" class="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-xs transition">
+                OK
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR HORÁRIOS DO TURNO -->
+    <div id="modal-editar-horarios" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="text-sm font-bold text-slate-900 uppercase">Editar Horas do Turno</h3>
+                <button onclick="fecharModalEditarHorarios()" class="text-slate-400 hover:text-slate-700 text-xs font-bold">✕ Fechar</button>
+            </div>
+            <p class="text-xs text-slate-500">Modifique os horários da sua linha conforme necessário:</p>
+            <div id="lista-inputs-horarios" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
+            <div class="flex gap-2 pt-2 border-t">
+                <button onclick="fecharModalEditarHorarios()" class="w-1/2 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Cancelar</button>
+                <button onclick="salvarHorariosEditados()" class="w-1/2 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition">Salvar Horários</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MENU GAVETA LATERAL -->
+    <div id="drawer-backdrop" onclick="toggleGaveta(false)" class="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 hidden transition-opacity"></div>
+    
+    <aside id="drawer-menu" class="fixed top-0 left-0 h-full w-80 bg-slate-900 text-white z-50 transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col shadow-2xl border-r border-slate-800">
+        <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span class="font-bold text-xs tracking-wider uppercase text-slate-200">Menu de Gestão</span>
+            </div>
+            <button onclick="toggleGaveta(false)" class="text-slate-400 hover:text-white bg-slate-800 px-2.5 py-1 rounded text-xs font-semibold">
+                ✕ Fechar
+            </button>
+        </div>
+
+        <div class="p-4 flex-grow overflow-y-auto space-y-5">
+            <div class="space-y-1.5">
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">Navegação</p>
+                <button id="nav-horahora" onclick="mudarAba('horahora')" class="w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white flex items-center gap-2.5 transition">
+                    <span>📋</span> Quadro Hora-Hora
+                </button>
+                <button id="nav-eficiencia" onclick="mudarAba('eficiencia')" class="w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-800 flex items-center gap-2.5 transition">
+                    <span>⚙️</span> Cálculo & Eficiência
+                </button>
+                <button id="nav-operadores" onclick="mudarAba('operadores')" class="w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-800 flex items-center gap-2.5 transition">
+                    <span>👥</span> Operadores & Desempenho
+                </button>
+                <button id="nav-tempos" onclick="mudarAba('tempos')" class="w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-800 flex items-center gap-2.5 transition">
+                    <span>⏱️</span> Tabela de Tempos
+                </button>
+                <button id="nav-historico" onclick="mudarAba('historico')" class="w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-800 flex items-center gap-2.5 transition">
+                    <span>📅</span> Histórico & Backup
+                </button>
+            </div>
+
+            <!-- Modelos do Turno -->
+            <div class="space-y-3 pt-3 border-t border-slate-800">
+                <div class="flex justify-between items-center">
+                    <p class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Modelos & Volumes do Turno</p>
+                    <span class="text-[11px] text-slate-400">Soma = Meta</span>
+                </div>
+
+                <div id="aviso-sem-tempos" class="hidden bg-amber-900/40 border border-amber-600/50 p-3 rounded-lg text-xs text-amber-200 space-y-2">
+                    <p class="font-bold">⚠️ Nenhum tempo carregado!</p>
+                    <p>Vá em <b>Histórico & Backup</b> e clique em <b>Carregar Backup</b> para selecionar o arquivo <code>tempos.json</code> do seu celular.</p>
+                </div>
+
+                <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 space-y-2">
+                    <div class="flex justify-between items-center"><span class="text-xs font-bold text-slate-300">MOD. 1</span><span id="gaveta-tempo-1" class="text-xs font-mono font-bold text-emerald-400">0 min</span></div>
+                    <div class="flex gap-2">
+                        <select id="mod-1-nome" onchange="recalcularTudo()" class="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs font-semibold uppercase text-white focus:outline-none"><option value="">Selecione...</option></select>
+                        <input type="number" id="mod-1-vol" value="0" oninput="recalcularTudo()" placeholder="Pares" class="w-20 px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs font-bold text-center text-amber-400 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 space-y-2">
+                    <div class="flex justify-between items-center"><span class="text-xs font-bold text-slate-300">MOD. 2</span><span id="gaveta-tempo-2" class="text-xs font-mono font-bold text-emerald-400">0 min</span></div>
+                    <div class="flex gap-2">
+                        <select id="mod-2-nome" onchange="recalcularTudo()" class="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs font-semibold uppercase text-white focus:outline-none"><option value="">Selecione...</option></select>
+                        <input type="number" id="mod-2-vol" value="0" oninput="recalcularTudo()" placeholder="Pares" class="w-20 px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs font-bold text-center text-amber-400 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 space-y-2">
+                    <div class="flex justify-between items-center"><span class="text-xs font-bold text-slate-300">MOD. 3</span><span id="gaveta-tempo-3" class="text-xs font-mono font-bold text-emerald-400">0 min</span></div>
+                    <div class="flex gap-2">
+                        <select id="mod-3-nome" onchange="recalcularTudo()" class="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs font-semibold uppercase text-white focus:outline-none"><option value="">Selecione...</option></select>
+                        <input type="number" id="mod-3-vol" value="0" oninput="recalcularTudo()" placeholder="Pares" class="w-20 px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs font-bold text-center text-amber-400 focus:outline-none">
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-2 pt-2 border-t border-slate-800">
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">Backup & Armazenamento</p>
+                <button onclick="salvarBackupGaveta()" class="w-full py-2.5 px-3 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-bold text-xs transition flex items-center justify-center gap-2 shadow-sm">
+                    💾 Salvar Backup Geral
+                </button>
+                <button onclick="carregarBackupGaveta()" class="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-bold text-xs transition flex items-center justify-center gap-2 shadow-sm">
+                    📂 Carregar Backup no Sistema
+                </button>
+                <button onclick="zerarTurno(); toggleGaveta(false);" class="w-full py-2 px-3 bg-slate-800 hover:bg-red-900/60 text-slate-300 hover:text-red-200 border border-slate-700 rounded-lg font-semibold text-xs transition mt-2">
+                    🔄 Zerar Lançamentos do Turno
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- CABEÇALHO SUPERIOR -->
+    <header class="bg-slate-900 text-white sticky top-0 z-40 border-b border-slate-800 shadow-md">
+        <div class="w-full px-2 py-2.5 flex justify-between items-center gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+                <button onclick="toggleGaveta(true)" class="bg-slate-800 hover:bg-slate-700 text-white px-2.5 py-1.5 rounded-lg flex items-center gap-1 text-xs font-bold transition shrink-0 border border-slate-700">
+                    <span class="text-base font-black">☰</span>
+                    <span>Menu</span>
+                </button>
+                <div class="min-w-0">
+                    <h1 id="titulo-pagina-atual" class="text-xs font-bold tracking-wider truncate text-slate-100">QUADRO HORA-HORA</h1>
+                    <p id="subtitulo-modelos-ativos" class="text-[10px] text-emerald-400 font-medium truncate">Linha 06</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0">
+                <input type="date" id="data-turno" class="bg-slate-800 text-white text-[11px] px-2 py-1.5 rounded-lg border border-slate-700 focus:outline-none font-semibold">
+                <button onclick="salvarTurnoHistorico()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition shrink-0 flex items-center gap-1">
+                    💾 <span class="hidden sm:inline">Salvar</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ABA 1: QUADRO HORA-HORA -->
+    <main id="aba-horahora" class="flex-grow w-full p-1 sm:p-2 space-y-3">
+        
+        <!-- 1. PLANILHA HORA-HORA NO TOPO -->
+        <section class="bg-white rounded-none sm:rounded-xl shadow-sm border-y sm:border border-slate-200 overflow-hidden -mx-1 sm:mx-0">
+            <div class="overflow-x-auto relative">
+                <table class="w-full border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-900 text-white font-bold" id="header-divisores"></tr>
+                        <tr class="bg-slate-200 text-slate-800 uppercase font-bold border-b border-slate-300" id="header-colunas"></tr>
+                    </thead>
+                    <tbody id="corpo-tabela" class="divide-y divide-slate-200"></tbody>
+                    <tfoot class="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-300 text-xs" id="rodape-tabela"></tfoot>
+                </table>
+            </div>
+        </section>
+
+        <!-- LEGENDA SEMÁFORO -->
+        <div class="flex flex-wrap items-center justify-between text-[11px] text-slate-600 px-1 gap-1 font-medium">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-slate-900 font-bold">Semáforo:</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-xs bg-emerald-500 inline-block"></span> Verde</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-xs bg-amber-400 inline-block"></span> Amarelo</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-xs bg-red-600 inline-block"></span> Vermelho</span>
+            </div>
+            <span class="text-slate-500">Deslize ⇄</span>
+        </div>
+
+        <!-- BANNER MOTIVACIONAL / META BATIDA -->
+        <div class="flex items-center gap-2 px-1 sm:px-0">
+            <div id="banner-motivacional" class="flex-grow bg-slate-900 text-white text-center py-2.5 px-3 rounded-xl font-bold text-xs tracking-wide card-shadow whitespace-pre-line border border-slate-800">
+                MOTIVE A SUA EQUIPE PRA ALCANÇARMOS O OBJETIVO DE HOJE!!!
+            </div>
+            <button id="btn-toggle-dash" onclick="toggleDashboard()" class="bg-white hover:bg-slate-50 text-slate-700 px-3 py-2.5 rounded-xl font-bold text-xs shrink-0 card-shadow border border-slate-200 transition flex items-center gap-1">
+                👁️ <span class="hidden sm:inline">Ocultar</span>
+            </button>
+        </div>
+
+        <!-- 2. DASHBOARD & CONFIGURAÇÕES -->
+        <div id="painel-recolhivel-completo" class="space-y-3 px-1 sm:px-0 transition-all">
+            <section class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                <div class="bg-white p-3 rounded-xl card-shadow border border-slate-200 text-center">
+                    <p class="text-[11px] text-slate-500 uppercase font-bold">Meta do Dia</p>
+                    <p id="dash-meta" class="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">1.008</p>
+                    <span id="dash-faltando" class="text-[11px] text-slate-600 block font-semibold">Faltando: 1.008 pares</span>
+                </div>
+                <div class="bg-white p-3 rounded-xl card-shadow border border-slate-200 text-center">
+                    <p class="text-[11px] text-slate-500 uppercase font-bold">Produção Realizada</p>
+                    <p id="dash-realizado" class="text-xl sm:text-2xl font-black text-blue-600 mt-0.5">0</p>
+                    <span id="dash-concluido" class="text-[11px] text-emerald-600 block font-semibold">0.0% concluído</span>
+                </div>
+                <div class="bg-white p-3 rounded-xl card-shadow border border-slate-200 cursor-pointer hover:border-blue-300 transition text-center" onclick="mudarAba('eficiencia')">
+                    <p class="text-[11px] text-slate-500 uppercase font-bold">Eficiência Projetada ↗</p>
+                    <p id="dash-eficiencia" class="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">0.0%</p>
+                    <span id="dash-pessoas-ativas" class="text-[11px] text-slate-600 block font-semibold">13 pessoas ativas</span>
+                </div>
+                <div id="dash-card-status" class="bg-emerald-50 p-3 rounded-xl card-shadow border border-emerald-200 text-center">
+                    <p class="text-[11px] text-slate-600 uppercase font-bold">Saldo / Situação</p>
+                    <p id="dash-saldo" class="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5">0</p>
+                    <span id="dash-status-txt" class="text-[11px] font-black text-emerald-700 block">ESTA BOM !</span>
+                </div>
+            </section>
+
+            <section class="bg-white p-3 rounded-xl card-shadow border border-slate-200 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 items-end">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase">Linha / Líder</label>
+                    <input type="text" id="cfg-linha" value="LINHA - 06" onchange="recalcularTudo()" class="w-full mt-1 px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-lg font-semibold text-xs">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase">M. Obra (Sinc.)</label>
+                    <input type="number" id="cfg-mobra" value="13" min="1" oninput="sincronizarMobraMain()" class="w-full mt-1 px-2 py-1.5 bg-emerald-50 border border-emerald-300 rounded-lg font-bold text-xs text-center text-emerald-900">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-emerald-700 uppercase">Qtd. Máquinas</label>
+                    <input type="number" id="cfg-qmaq" value="4" min="1" max="20" oninput="ajustarQtdMaquinas(this.value)" class="w-full mt-1 px-2 py-1.5 bg-emerald-50 border border-emerald-400 rounded-lg font-bold text-xs text-center text-emerald-900">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-amber-700 uppercase">Meta / Hora (Máq.)</label>
+                    <input type="number" id="cfg-mhora" value="36" oninput="recalcularTudo(false, true)" class="w-full mt-1 px-2 py-1.5 bg-amber-50 border border-amber-300 rounded-lg font-bold text-xs text-center text-amber-900">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase">Meta Hora-Hora Linha</label>
+                    <input type="number" id="cfg-metahoralinha" value="144" oninput="recalcularTudo(false, true)" class="w-full mt-1 px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-lg font-bold text-xs text-center text-slate-800">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-blue-700 uppercase">Meta Geral / Total</label>
+                    <input type="number" id="cfg-meta" value="1008" oninput="recalcularTudo(true, false)" class="w-full mt-1 px-2 py-1.5 bg-blue-50 border border-blue-300 rounded-lg font-bold text-xs text-center text-blue-800">
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- ABA 2: CÁLCULO & EFICIÊNCIA -->
+    <main id="aba-eficiencia" class="hidden flex-grow w-full p-2 sm:p-4 space-y-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <section class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 space-y-3">
+                <h2 class="font-bold text-slate-900 text-xs uppercase border-b pb-2">1. Quadro de Mão de Obra</h2>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                        <span class="text-slate-500 block font-medium">M.O. REAL</span>
+                        <span id="ef-mo-base" class="text-base font-black text-slate-900">13</span>
+                    </div>
+                    <div class="bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+                        <span class="text-emerald-700 block font-medium">PESSOAS ATIVAS</span>
+                        <span id="ef-mo-ativa" class="text-base font-black text-emerald-700">13</span>
+                    </div>
+                </div>
+                <div class="space-y-1.5 text-xs pt-1">
+                    <div class="flex justify-between items-center"><label class="font-semibold text-slate-700">(-) Treinando:</label><input type="number" id="mo-treinando" value="0" min="0" oninput="sincronizarMobraEficiencia()" class="w-16 text-center border border-slate-300 rounded p-1 font-semibold"></div>
+                    <div class="flex justify-between items-center"><label class="font-semibold text-slate-700">(-) Afastado:</label><input type="number" id="mo-afastado" value="0" min="0" oninput="sincronizarMobraEficiencia()" class="w-16 text-center border border-slate-300 rounded p-1 font-semibold"></div>
+                    <div class="flex justify-between items-center"><label class="font-semibold text-slate-700">(-) Férias:</label><input type="number" id="mo-ferias" value="0" min="0" oninput="sincronizarMobraEficiencia()" class="w-16 text-center border border-slate-300 rounded p-1 font-semibold"></div>
+                    <div class="flex justify-between items-center"><label class="font-semibold text-slate-700">(-) Faltas:</label><input type="number" id="mo-faltas" value="0" min="0" oninput="sincronizarMobraEficiencia()" class="w-16 text-center border border-slate-300 rounded p-1 font-semibold"></div>
+                    <div class="flex justify-between items-center"><label class="font-semibold text-slate-700">(-) Emprestou:</label><input type="number" id="mo-emprestou" value="0" min="0" oninput="sincronizarMobraEficiencia()" class="w-16 text-center border border-slate-300 rounded p-1 font-semibold"></div>
+                    <div class="flex justify-between items-center"><label class="font-semibold text-emerald-700">(+) Recebeu:</label><input type="number" id="mo-recebeu" value="0" min="0" oninput="sincronizarMobraEficiencia()" class="w-16 text-center border border-emerald-300 bg-emerald-50 rounded p-1 font-semibold"></div>
+                    <div class="flex justify-between items-center pt-2 border-t"><label class="font-semibold text-slate-700">Tempo Turno (min):</label><input type="number" id="ef-tempo-turno" value="440" oninput="recalcularTudo()" class="w-16 text-center border border-slate-300 rounded p-1 font-semibold bg-slate-50"></div>
+                </div>
+            </section>
+
+            <section class="lg:col-span-2 bg-white p-3.5 rounded-xl card-shadow border border-slate-200 flex flex-col justify-between space-y-3">
+                <div>
+                    <div class="flex flex-wrap justify-between items-center border-b pb-2 mb-2 gap-2">
+                        <h2 class="font-bold text-slate-900 text-xs uppercase">2. Cálculo & Meta p/ 80%</h2>
+                        <span id="ef-mensagem-status" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">BOM TRABALHO</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 uppercase border-b font-bold">
+                                    <th class="p-2">Slot</th>
+                                    <th class="p-2">Modelo</th>
+                                    <th class="p-2 text-center">Tempo</th>
+                                    <th class="p-2 text-center">Vol</th>
+                                    <th class="p-2 text-center">Minutos</th>
+                                    <th class="p-2 text-center bg-amber-50 text-amber-900">Pares 80%</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-calculo-modelos" class="divide-y divide-slate-200"></tbody>
+                            <tfoot class="bg-slate-50 font-bold border-t-2 border-slate-300 text-xs">
+                                <tr>
+                                    <td colspan="3" class="p-2 text-right uppercase text-slate-700">Total:</td>
+                                    <td id="ef-total-vol" class="p-2 text-center text-blue-700">0</td>
+                                    <td id="ef-total-min" class="p-2 text-center text-slate-900">0 min</td>
+                                    <td class="p-2 text-center text-slate-400">-</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                    <div class="bg-slate-900 text-white p-2.5 rounded-lg">
+                        <span class="text-[10px] text-slate-400 uppercase font-semibold block">Eficiência / PROL</span>
+                        <span id="ef-card-prol" class="text-base font-black text-emerald-400 block">0.0%</span>
+                    </div>
+                    <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                        <span class="text-[10px] text-slate-500 uppercase font-semibold block">Eficiência (435m)</span>
+                        <span id="ef-card-435" class="text-base font-black text-blue-700 block">0.0%</span>
+                    </div>
+                    <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                        <span class="text-[10px] text-slate-500 uppercase font-semibold block">Minutos Equipe</span>
+                        <span id="ef-card-mindisp" class="text-base font-black text-slate-900 block">5.720</span>
+                    </div>
+                    <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                        <span class="text-[10px] text-slate-500 uppercase font-semibold block">Absenteísmo</span>
+                        <span id="ef-card-abs" class="text-base font-black text-slate-900 block">0.0%</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- ABA 3: OPERADORES & DESEMPENHO -->
+    <main id="aba-operadores" class="hidden flex-grow w-full p-2 sm:p-4 space-y-4">
+        <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 space-y-3">
+            <div class="flex flex-wrap justify-between items-center gap-2 border-b pb-2">
+                <div>
+                    <h2 class="text-sm font-bold text-slate-900">Escala de Operadores</h2>
+                    <p class="text-[11px] text-slate-500">Defina os 2 operadores de cada máquina.</p>
+                </div>
+                <button onclick="salvarOperadores()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                    💾 Salvar Escala
+                </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5" id="cards-operadores-container"></div>
+        </div>
+
+        <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 space-y-3">
+            <div class="flex flex-wrap justify-between items-center gap-2">
+                <h2 class="text-sm font-bold text-slate-900">Gráfico de Desempenho Hora a Hora</h2>
+                <select id="filtro-grafico-maq" onchange="renderizarGraficoOperadores()" class="px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs font-semibold focus:outline-none">
+                    <option value="todas">Todas as Máquinas</option>
+                </select>
+            </div>
+            <div class="w-full h-64 sm:h-80">
+                <canvas id="graficoOperadoresMovimento"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <!-- ABA 4: TABELA DE TEMPOS -->
+    <main id="aba-tempos" class="hidden flex-grow w-full p-2 sm:p-4 space-y-4">
+        <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 flex flex-wrap justify-between items-center gap-2">
+            <div>
+                <h2 class="text-sm font-bold text-slate-900">Tabela de Tempos por Modelo</h2>
+                <p class="text-[11px] text-slate-500">Cadastre e gerencie tempos dos modelos.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <input type="text" id="novo-modelo-nome" placeholder="Modelo" class="px-2.5 py-1.5 border border-slate-300 rounded text-xs uppercase font-semibold flex-grow sm:flex-grow-0 focus:outline-none">
+                <input type="number" step="0.001" id="novo-modelo-tempo" placeholder="Tempo" class="w-24 px-2.5 py-1.5 border border-slate-300 rounded text-xs font-semibold focus:outline-none">
+                <button onclick="adicionarOuAtualizarModelo()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded text-xs font-bold transition w-full sm:w-auto">+ Salvar</button>
+            </div>
+        </div>
+        <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 space-y-3">
+            <input type="text" id="busca-modelo" oninput="renderizarTabelaTempos()" placeholder="🔍 Buscar modelo..." class="w-full sm:w-72 px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded text-xs font-semibold focus:outline-none">
+            <div class="overflow-x-auto max-h-[450px]">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead class="sticky top-0 bg-slate-100 text-slate-700 uppercase border-b font-bold">
+                        <tr>
+                            <th class="p-2">Modelo</th>
+                            <th class="p-2 text-center">Tempo (min)</th>
+                            <th class="p-2 text-center">P/H (100%)</th>
+                            <th class="p-2 text-center">P/H (80%)</th>
+                            <th class="p-2 text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpo-tabela-tempos" class="divide-y divide-slate-200"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- ABA 5: HISTÓRICO & BACKUP -->
+    <main id="aba-historico" class="hidden flex-grow w-full p-2 sm:p-4 space-y-4">
+        <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 flex flex-wrap justify-between items-center gap-2">
+            <div>
+                <h2 class="text-sm font-bold text-slate-900">Histórico de Produção & Backup</h2>
+                <p class="text-[11px] text-slate-500">Gerencie turnos salvos e arquivos JSON.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <select id="filtro-periodo" onchange="renderizarHistorico()" class="px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded text-xs font-semibold focus:outline-none">
+                    <option value="semana">Últimos 7 dias</option>
+                    <option value="mes" selected>Mês Atual</option>
+                    <option value="todos">Todos</option>
+                </select>
+                <button onclick="exportarBackupGeral()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded text-xs font-semibold transition">⬇️ Baixar</button>
+                <label class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold cursor-pointer transition">
+                    ⬆️ Carregar
+                    <input type="file" accept=".json" onchange="importarBackupGeral(event)" class="hidden">
+                </label>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div class="bg-white p-3 rounded-xl card-shadow border border-slate-200">
+                <span class="text-[10px] font-bold text-slate-500 uppercase">Total Produzido</span>
+                <p id="hist-total-pares" class="text-xl font-black text-blue-600 mt-0.5">0 pares</p>
+            </div>
+            <div class="bg-white p-3 rounded-xl card-shadow border border-slate-200">
+                <span class="text-[10px] font-bold text-slate-500 uppercase">Média Eficiência</span>
+                <p id="hist-media-ef" class="text-xl font-black text-emerald-600 mt-0.5">0.0%</p>
+            </div>
+            <div class="bg-white p-3 rounded-xl card-shadow border border-slate-200">
+                <span class="text-[10px] font-bold text-slate-500 uppercase">Turnos Salvos</span>
+                <p id="hist-dias-count" class="text-xl font-black text-slate-900 mt-0.5">0</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl card-shadow border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-700 uppercase border-b font-bold">
+                            <th class="p-2.5">Data</th>
+                            <th class="p-2.5">Linha</th>
+                            <th class="p-2.5">Modelos</th>
+                            <th class="p-2.5 text-center">Meta</th>
+                            <th class="p-2.5 text-center">Realizado</th>
+                            <th class="p-2.5 text-center">Eficiência</th>
+                            <th class="p-2.5 text-center">Saldo</th>
+                            <th class="p-2.5 text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpo-historico" class="divide-y divide-slate-200"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {});
+            });
+        }
+
+        function toggleMenuTurno(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('menu-dropdown-turno');
+            menu.classList.toggle('hidden');
+        }
+
+        window.addEventListener('click', () => {
+            const menu = document.getElementById('menu-dropdown-turno');
+            if (menu && !menu.classList.contains('hidden')) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        function abrirModalEditarHorarios() {
+            document.getElementById('menu-dropdown-turno').classList.add('hidden');
+            const container = document.getElementById('lista-inputs-horarios');
+            container.innerHTML = '';
+            estado.linhas.forEach((l, idx) => {
+                container.innerHTML += `
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-600 w-16">Hora ${idx + 1}:</span>
+                        <input type="text" id="input-hora-edit-${idx}" value="${l.hora}" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    </div>
+                `;
+            });
+            document.getElementById('modal-editar-horarios').classList.remove('hidden');
+        }
+
+        function fecharModalEditarHorarios() {
+            document.getElementById('modal-editar-horarios').classList.add('hidden');
+        }
+
+        function salvarHorariosEditados() {
+            estado.linhas.forEach((l, idx) => {
+                const input = document.getElementById(`input-hora-edit-${idx}`);
+                if (input) {
+                    l.hora = input.value.trim();
+                }
+            });
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+            fecharModalEditarHorarios();
+            recalcularTudo(false, true);
+        }
+
+        function adicionarHoraTurno() {
+            document.getElementById('menu-dropdown-turno').classList.add('hidden');
+            estado.linhas.push({
+                hora: 'NOVA',
+                registros: Array(estado.qtdMaquinas).fill(null)
+            });
+
+            let tempoAtual = parseFloat(document.getElementById('ef-tempo-turno').value) || 440;
+            let novoTempo = tempoAtual + 55;
+            document.getElementById('ef-tempo-turno').value = novoTempo;
+            estado.moAjustes.tempoTurno = novoTempo;
+
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+            recalcularTudo(false, true);
+            abrirModalEditarHorarios();
+        }
+
+        function removerHoraTurno() {
+            document.getElementById('menu-dropdown-turno').classList.add('hidden');
+            if (estado.linhas.length <= 1) {
+                return mostrarAviso('O turno precisa ter pelo menos um horário.');
+            }
+            estado.linhas.pop();
+
+            let tempoAtual = parseFloat(document.getElementById('ef-tempo-turno').value) || 440;
+            let novoTempo = Math.max(55, tempoAtual - 55);
+            document.getElementById('ef-tempo-turno').value = novoTempo;
+            estado.moAjustes.tempoTurno = novoTempo;
+
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+            recalcularTudo(false, true);
+        }
+
+        function mostrarAviso(msg) {
+            document.getElementById('modal-aviso-texto').innerText = msg;
+            document.getElementById('modal-aviso').classList.remove('hidden');
+        }
+
+        let bancoTempos = JSON.parse(localStorage.getItem('app_tempos_db')) || {};
+        const HORARIOS_PADRAO = ['05:00', '06:00', '07:10', '08:10', '09:10', '11:20', '12:20', '13:20'];
+
+        let estado = JSON.parse(localStorage.getItem('app_estado_v12')) || {
+            linha: 'LINHA - 06',
+            mobra: 13,
+            qtdMaquinas: 4,
+            metaHoraMaq: 36,
+            metaHoraLinha: 144,
+            metaManual: 1008,
+            dashboardOculto: false,
+            metaJaComemorada: false,
+            modelos: [
+                { nome: '', vol: 0 },
+                { nome: '', vol: 0 },
+                { nome: '', vol: 0 }
+            ],
+            moAjustes: { treinando: 0, afastado: 0, ferias: 0, faltas: 0, emprestou: 0, recebeu: 0, tempoTurno: 440 },
+            divisores: [2, 2, 2, 2, 2, 1, 2, 2, 2, 2],
+            operadoresMaquinas: {},
+            linhas: HORARIOS_PADRAO.map((h, idx) => ({
+                hora: h,
+                registros: idx === 0 ? [80, 80, 82, 84] : []
+            }))
+        };
+
+        let graficoOperadoresInstance = null;
+        document.getElementById('data-turno').valueAsDate = new Date();
+
+        function dispararConfeteMetaBatida(totalRealizado) {
+            document.getElementById('modal-meta-valor').innerText = `${totalRealizado.toLocaleString('pt-BR')} pares`;
+            document.getElementById('modal-meta-batida').classList.remove('hidden');
+
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+                setTimeout(() => {
+                    confetti({ particleCount: 80, angle: 60, spread: 60, origin: { x: 0 } });
+                    confetti({ particleCount: 80, angle: 120, spread: 60, origin: { x: 1 } });
+                }, 350);
+            }
+        }
+
+        function fecharModalMetaBatida() {
+            document.getElementById('modal-meta-batida').classList.add('hidden');
+        }
+
+        function verificarTemposVazios() {
+            const aviso = document.getElementById('aviso-sem-tempos');
+            if (Object.keys(bancoTempos).length === 0) {
+                if (aviso) aviso.classList.remove('hidden');
+            } else {
+                if (aviso) aviso.classList.add('hidden');
+            }
+        }
+
+        function toggleGaveta(abrir) {
+            const drawer = document.getElementById('drawer-menu');
+            const backdrop = document.getElementById('drawer-backdrop');
+            if (abrir) {
+                backdrop.classList.remove('hidden');
+                drawer.classList.remove('-translate-x-full');
+            } else {
+                drawer.classList.add('-translate-x-full');
+                backdrop.classList.add('hidden');
+            }
+        }
+
+        function toggleDashboard() {
+            estado.dashboardOculto = !estado.dashboardOculto;
+            const painel = document.getElementById('painel-recolhivel-completo');
+            const btn = document.getElementById('btn-toggle-dash');
+            if (estado.dashboardOculto) {
+                painel.classList.add('hidden');
+                btn.innerHTML = '👁️ <span class="hidden sm:inline">Mostrar</span>';
+            } else {
+                painel.classList.remove('hidden');
+                btn.innerHTML = '👁️ <span class="hidden sm:inline">Ocultar</span>';
+                painel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+        }
+
+        function buscarTempoModelo(nome) {
+            if (!nome) return 0;
+            const chaveExata = Object.keys(bancoTempos).find(k => k.toLowerCase() === nome.trim().toLowerCase());
+            return chaveExata ? bancoTempos[chaveExata] : 0;
+        }
+
+        function atualizarSelectsModelos() {
+            verificarTemposVazios();
+            const listaModelos = Object.keys(bancoTempos).sort();
+            for (let i = 1; i <= 3; i++) {
+                const select = document.getElementById(`mod-${i}-nome`);
+                const valorAtual = select.value || estado.modelos[i-1]?.nome || '';
+                select.innerHTML = '<option value="">Selecione...</option>' + 
+                    listaModelos.map(m => `<option value="${m}">${m} (${bancoTempos[m]} min)</option>`).join('');
+                select.value = valorAtual;
+            }
+        }
+
+        function sincronizarMobraMain() {
+            estado.mobra = parseInt(document.getElementById('cfg-mobra').value) || 0;
+            recalcularTudo();
+        }
+
+        function sincronizarMobraEficiencia() {
+            recalcularTudo();
+        }
+
+        function ajustarQtdMaquinas(novaQtd) {
+            const qtd = Math.max(1, Math.min(20, parseInt(novaQtd) || 1));
+            estado.qtdMaquinas = qtd;
+            while (estado.divisores.length < qtd) estado.divisores.push(2);
+            estado.linhas.forEach(l => {
+                while (l.registros.length < qtd) l.registros.push(null);
+            });
+            recalcularTudo(false, false);
+        }
+
+        function alterarDivisor(maqIdx, val) {
+            estado.divisores[maqIdx] = parseInt(val) || 1;
+            recalcularTudo(false, true);
+        }
+
+        function aoDigitarRegistro(inputEl, linhaIdx, maqIdx) {
+            const valor = inputEl.value.replace(/\D/g, '');
+            if (valor.length >= 2) {
+                const doisDigitos = valor.slice(0, 2);
+                inputEl.value = doisDigitos;
+                const valNum = parseFloat(doisDigitos);
+                estado.linhas[linhaIdx].registros[maqIdx] = isNaN(valNum) ? null : valNum;
+                recalcularTudo(false, true);
+
+                let proxLinha = linhaIdx;
+                let proxMaq = maqIdx + 1;
+                if (proxMaq >= estado.qtdMaquinas) {
+                    proxMaq = 0;
+                    proxLinha = linhaIdx + 1;
+                }
+                const proxInput = document.querySelector(`.input-registro-hora[data-linha="${proxLinha}"][data-maq="${proxMaq}"]`);
+                if (proxInput) {
+                    proxInput.focus();
+                    proxInput.select();
+                }
+            }
+        }
+
+        function atualizarHoraLinha(linhaIdx, novaHora) {
+            estado.linhas[linhaIdx].hora = novaHora;
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+        }
+
+        function atualizarRegistro(linhaIdx, maqIdx, valStr) {
+            const val = valStr === '' ? null : parseFloat(valStr);
+            estado.linhas[linhaIdx].registros[maqIdx] = isNaN(val) ? null : val;
+            recalcularTudo(false, true);
+        }
+
+        function obterClasseSemaforo(valorReal, temRegistro) {
+            if (!temRegistro) return 'bg-slate-50 text-slate-400';
+            const meta = estado.metaHoraMaq;
+            if (valorReal >= meta) return 'bg-emerald-500 text-white font-bold';
+            if (valorReal >= (meta - 3)) return 'bg-amber-400 text-slate-950 font-bold';
+            return 'bg-red-600 text-white font-bold';
+        }
+
+        function recalcularTudo(metaEditadaManualmente = false, metaMaqEditadaManualmente = false) {
+            estado.linha = document.getElementById('cfg-linha').value;
+            estado.qtdMaquinas = parseInt(document.getElementById('cfg-qmaq').value) || 4;
+
+            estado.modelos[0] = { nome: document.getElementById('mod-1-nome').value, vol: parseFloat(document.getElementById('mod-1-vol').value) || 0 };
+            estado.modelos[1] = { nome: document.getElementById('mod-2-nome').value, vol: parseFloat(document.getElementById('mod-2-vol').value) || 0 };
+            estado.modelos[2] = { nome: document.getElementById('mod-3-nome').value, vol: parseFloat(document.getElementById('mod-3-vol').value) || 0 };
+
+            for (let i = 0; i < 3; i++) {
+                const t = buscarTempoModelo(estado.modelos[i].nome);
+                document.getElementById(`gaveta-tempo-${i+1}`).innerText = t > 0 ? `${t.toFixed(3)} min` : '0 min';
+            }
+            const resumoMod = estado.modelos.filter(m => m.vol > 0).map(m => `${m.nome.toUpperCase()} (${m.vol})`).join(' • ');
+            document.getElementById('subtitulo-modelos-ativos').innerText = `${estado.linha} | ${resumoMod || 'Sem volume'}`;
+
+            const somaVolumesModelos = estado.modelos.reduce((acc, m) => acc + m.vol, 0);
+            if (!metaEditadaManualmente && somaVolumesModelos > 0) {
+                estado.metaManual = somaVolumesModelos;
+                document.getElementById('cfg-meta').value = somaVolumesModelos;
+            } else {
+                estado.metaManual = parseFloat(document.getElementById('cfg-meta').value) || 1008;
+            }
+
+            const qtdHorarios = estado.linhas.length || 7;
+            if (!metaMaqEditadaManualmente) {
+                const metaLinhaCalc = Math.round(estado.metaManual / qtdHorarios);
+                const metaPorMaqCalc = Math.ceil(metaLinhaCalc / (estado.qtdMaquinas || 1));
+                estado.metaHoraLinha = metaLinhaCalc;
+                estado.metaHoraMaq = metaPorMaqCalc;
+                document.getElementById('cfg-metahoralinha').value = metaLinhaCalc;
+                document.getElementById('cfg-mhora').value = metaPorMaqCalc;
+            } else {
+                estado.metaHoraMaq = parseFloat(document.getElementById('cfg-mhora').value) || 0;
+                estado.metaHoraLinha = parseFloat(document.getElementById('cfg-metahoralinha').value) || 0;
+            }
+
+            estado.moAjustes = {
+                treinando: parseInt(document.getElementById('mo-treinando').value) || 0,
+                afastado: parseInt(document.getElementById('mo-afastado').value) || 0,
+                ferias: parseInt(document.getElementById('mo-ferias').value) || 0,
+                faltas: parseInt(document.getElementById('mo-faltas').value) || 0,
+                emprestou: parseInt(document.getElementById('mo-emprestou').value) || 0,
+                recebeu: parseInt(document.getElementById('mo-recebeu').value) || 0,
+                tempoTurno: parseFloat(document.getElementById('ef-tempo-turno').value) || 440
+            };
+
+            const pessoasAtivas = Math.max(0, estado.mobra - estado.moAjustes.treinando - estado.moAjustes.afastado - estado.moAjustes.ferias - estado.moAjustes.faltas - estado.moAjustes.emprestou + estado.moAjustes.recebeu);
+
+            let minutosExecutadosTotal = 0;
+            const tbodyEf = document.getElementById('tabela-calculo-modelos');
+            tbodyEf.innerHTML = '';
+
+            estado.modelos.forEach((mod, i) => {
+                const tempoUnit = buscarTempoModelo(mod.nome);
+                const minGerados = tempoUnit * mod.vol;
+                minutosExecutadosTotal += minGerados;
+                const paresPara80 = (tempoUnit > 0 && pessoasAtivas > 0) ? Math.ceil((0.80 * estado.moAjustes.tempoTurno * pessoasAtivas) / tempoUnit) : 0;
+
+                tbodyEf.innerHTML += `
+                    <tr>
+                        <td class="p-2 font-semibold text-slate-600">MOD. ${i + 1}</td>
+                        <td class="p-2 font-bold text-slate-900 uppercase">${mod.nome || '-'}</td>
+                        <td class="p-2 text-center font-mono">${tempoUnit > 0 ? tempoUnit.toFixed(3) : '<span class="text-red-500 font-semibold">Not found</span>'}</td>
+                        <td class="p-2 text-center font-bold text-blue-700">${mod.vol}</td>
+                        <td class="p-2 text-center font-semibold text-slate-800">${minGerados.toFixed(1)} min</td>
+                        <td class="p-2 text-center font-bold bg-amber-50 text-amber-900">${paresPara80 > 0 ? paresPara80 + ' pares' : '-'}</td>
+                    </tr>
+                `;
+            });
+
+            const minDisponiveis = pessoasAtivas * estado.moAjustes.tempoTurno;
+            const eficienciaProl = minDisponiveis > 0 ? (minutosExecutadosTotal / minDisponiveis) * 100 : 0;
+            const eficiencia435 = (pessoasAtivas * 435) > 0 ? (minutosExecutadosTotal / (pessoasAtivas * 435)) * 100 : 0;
+            const absenteismo = pessoasAtivas > 0 ? (estado.moAjustes.faltas / pessoasAtivas) * 100 : 0;
+
+            document.getElementById('ef-mo-base').innerText = estado.mobra;
+            document.getElementById('cfg-mobra').value = estado.mobra;
+            document.getElementById('ef-mo-ativa').innerText = pessoasAtivas;
+            document.getElementById('ef-total-vol').innerText = somaVolumesModelos;
+            document.getElementById('ef-total-min').innerText = minutosExecutadosTotal.toFixed(1) + ' min';
+            document.getElementById('ef-card-prol').innerText = eficienciaProl.toFixed(1) + '%';
+            document.getElementById('ef-card-435').innerText = eficiencia435.toFixed(1) + '%';
+            document.getElementById('ef-card-mindisp').innerText = minDisponiveis.toLocaleString('pt-BR');
+            document.getElementById('ef-card-abs').innerText = absenteismo.toFixed(1) + '%';
+
+            const msgEf = document.getElementById('ef-mensagem-status');
+            if (eficienciaProl >= 79) {
+                msgEf.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800';
+                msgEf.innerText = 'BOM TRABALHO (≥ 79%)';
+            } else if (eficienciaProl === 0) {
+                msgEf.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-800';
+                msgEf.innerText = 'VAMOS PROJETAR!';
+            } else {
+                msgEf.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800';
+                msgEf.innerText = 'MELHORE (< 79%)';
+            }
+
+            renderizarTabelaHoraHora(eficienciaProl, pessoasAtivas);
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+        }
+
+        function renderizarTabelaHoraHora(eficienciaProl, pessoasAtivas) {
+            const qMaq = estado.qtdMaquinas;
+            
+            let htmlDiv = `<th class="p-2.5 border-r border-slate-700 text-left sticky-col-hora bg-slate-900 sticky-shadow min-w-[70px] text-sm font-black">HORA</th>`;
+            for (let m = 0; m < qMaq; m++) {
+                const ops = estado.operadoresMaquinas[m + 1] || { op1: '', op2: '' };
+                const nomesOps = [ops.op1, ops.op2].filter(n => n && n.trim() !== '').join(' / ') || 'Sem operadores';
+                htmlDiv += `
+                    <th colspan="2" class="p-2.5 border-r-2 border-slate-700 text-center bg-slate-900">
+                        <div class="flex flex-col items-center justify-center gap-0.5">
+                            <div class="flex items-center justify-center gap-1.5">
+                                <span class="text-xs font-black text-emerald-400 uppercase">Maq ${m + 1}</span>
+                                <div class="inline-flex items-center gap-0.5 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">
+                                    <span class="text-[10px] text-slate-300">Div:</span>
+                                    <select onchange="alterarDivisor(${m}, this.value)" class="bg-amber-400 text-slate-950 font-bold text-[10px] px-1 rounded cursor-pointer">
+                                        <option value="2" ${estado.divisores[m] === 2 ? 'selected' : ''}>2</option>
+                                        <option value="1" ${estado.divisores[m] === 1 ? 'selected' : ''}>1</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="text-[11px] font-bold text-sky-300 truncate max-w-[170px]" title="${nomesOps}">
+                                👷 ${nomesOps}
+                            </div>
+                        </div>
+                    </th>
+                `;
+            }
+            htmlDiv += `
+                <th class="p-2.5 border-r border-slate-700 text-center text-slate-200 min-w-[85px]">
+                    <div class="flex flex-col items-center justify-center">
+                        <span class="text-[10px] font-bold">META/H</span>
+                        <span class="text-xs text-blue-300 font-mono font-black">${estado.metaHoraLinha}p</span>
+                    </div>
+                </th>
+                <th class="p-2.5 text-center text-slate-200 min-w-[75px] text-xs font-bold">SALDO</th>
+            `;
+            document.getElementById('header-divisores').innerHTML = htmlDiv;
+
+            let htmlCol = `<th class="p-2 border-r border-slate-300 text-left sticky-col-hora bg-slate-200 sticky-shadow min-w-[70px] relative">
+                        <button onclick="toggleMenuTurno(event)" class="w-full flex items-center justify-between font-bold text-slate-800 hover:text-blue-600 focus:outline-none">
+                            <span>TURNO</span>
+                            <span class="text-[10px]">▾</span>
+                        </button>
+                        <div id="menu-dropdown-turno" class="hidden absolute top-full left-0 mt-1 w-48 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 py-1.5 text-xs font-semibold text-slate-700">
+                            <button onclick="abrirModalEditarHorarios()" class="w-full text-left px-4 py-2 hover:bg-slate-100 flex items-center gap-2">
+                                <span>✏️</span> Editar Horas
+                            </button>
+                            <button onclick="adicionarHoraTurno()" class="w-full text-left px-4 py-2 hover:bg-slate-100 flex items-center gap-2 text-emerald-700 font-bold border-t border-slate-100">
+                                <span>➕</span> Acrescentar Hora
+                            </button>
+                            <button onclick="removerHoraTurno()" class="w-full text-left px-4 py-2 hover:bg-slate-100 flex items-center gap-2 text-red-600 border-t border-slate-100">
+                                <span>➖</span> Diminuir Hora
+                            </button>
+                        </div>
+                    </th>`;
+            for (let m = 0; m < qMaq; m++) {
+                htmlCol += `
+                    <th class="p-2 border-r border-slate-300 text-center bg-slate-100 text-slate-700 min-w-[95px]">REGISTRO</th>
+                    <th class="p-2 border-r-2 border-slate-300 text-center bg-slate-200 text-slate-900 min-w-[75px]">MAQ ${m + 1}</th>
+                `;
+            }
+            htmlCol += `<th class="p-2 border-r border-slate-300 text-center bg-blue-50 text-blue-900 min-w-[75px]">HORA</th><th class="p-2 text-center bg-slate-200 text-slate-900 min-w-[75px]">DIF</th>`;
+            document.getElementById('header-colunas').innerHTML = htmlCol;
+
+            const tbody = document.getElementById('corpo-tabela');
+            tbody.innerHTML = '';
+
+            let somaMaqReal = Array(qMaq).fill(0);
+            let somaMaqBruta = Array(qMaq).fill(0);
+            let totalRealizado = 0;
+            let saldoAcumulado = 0;
+
+            estado.linhas.forEach((linha, lIdx) => {
+                const isAlmoco = linha.hora.toUpperCase().includes('ALMOÇO') || linha.hora.toUpperCase().includes('ALMOCO');
+                let somaLinha = 0;
+                let temAlgum = false;
+                let rowHtml = `<td class="p-2 border-r border-slate-300 ${isAlmoco ? 'bg-slate-300' : 'bg-slate-100'} sticky-col-hora sticky-shadow min-w-[70px] text-center"><input type="text" value="${linha.hora}" onchange="atualizarHoraLinha(${lIdx}, this.value)" class="w-full bg-transparent text-center font-black ${isAlmoco ? 'text-amber-800' : 'text-slate-900'} text-sm sm:text-base focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-0.5"></td>`;
+
+                if (isAlmoco) {
+                    for (let m = 0; m < qMaq; m++) {
+                        rowHtml += `
+                            <td colspan="2" class="p-2 border-r-2 border-slate-300 text-center bg-slate-200 text-slate-600 font-bold text-[11px] uppercase tracking-wider">
+                                🍽️ ALMOÇO
+                            </td>
+                        `;
+                    }
+                    rowHtml += `
+                        <td class="p-2 border-r border-slate-200 text-center font-bold text-slate-500 bg-slate-200">-</td>
+                        <td class="p-2 text-center text-xs text-slate-500 bg-slate-200">-</td>
+                    `;
+                } else {
+                    for (let m = 0; m < qMaq; m++) {
+                        const reg = linha.registros[m];
+                        const temReg = reg !== null && reg !== undefined && reg !== '';
+                        const div = estado.divisores[m] || 1;
+                        const real = temReg ? (reg / div) : 0;
+
+                        if (temReg) {
+                            temAlgum = true;
+                            somaMaqReal[m] += real;
+                            somaMaqBruta[m] += reg;
+                            somaLinha += real;
+                        }
+
+                        const corSem = obterClasseSemaforo(real, temReg);
+                        rowHtml += `
+                            <td class="p-1 border-r border-slate-200 text-center min-w-[95px]">
+                                <input type="number" inputmode="numeric" data-linha="${lIdx}" data-maq="${m}" value="${temReg ? reg : ''}" placeholder="0"
+                                       oninput="aoDigitarRegistro(this, ${lIdx}, ${m})"
+                                       onchange="atualizarRegistro(${lIdx}, ${m}, this.value)"
+                                       class="input-registro-hora w-full text-center py-1.5 px-1 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none font-bold text-slate-900 bg-white text-sm sm:text-base font-black">
+                            </td>
+                            <td class="p-2 border-r-2 border-slate-300 text-center text-sm sm:text-base font-black min-w-[75px] ${corSem}">
+                                ${temReg ? (Number.isInteger(real) ? real : real.toFixed(1)) : '-'}
+                            </td>
+                        `;
+                    }
+
+                    totalRealizado += somaLinha;
+                    const dif = temAlgum ? (somaLinha - estado.metaHoraLinha) : 0;
+                    if (temAlgum) saldoAcumulado += dif;
+
+                    rowHtml += `
+                        <td class="p-2 border-r border-slate-200 text-center font-bold text-blue-700 bg-blue-50/50 text-sm sm:text-base font-black">${temAlgum ? somaLinha : '-'}</td>
+                        <td class="p-2 text-center text-sm sm:text-base font-black ${!temAlgum ? 'text-slate-400' : (dif >= 0 ? 'text-emerald-700' : 'text-red-700')}">
+                            ${temAlgum ? (dif > 0 ? '+' + dif : dif) : '-'}
+                        </td>
+                    `;
+                }
+                tbody.innerHTML += `<tr class="hover:bg-slate-50/80 transition">${rowHtml}</tr>`;
+            });
+
+            let footHtml = `<td class="p-2 border-r border-slate-300 text-left uppercase font-black sticky-col-hora bg-slate-200 sticky-shadow min-w-[70px]">TOTAL</td>`;
+            for (let m = 0; m < qMaq; m++) {
+                footHtml += `
+                    <td class="p-2 border-r border-slate-300 text-center text-slate-600 font-semibold text-xs">${somaMaqBruta[m]}</td>
+                    <td class="p-2 border-r-2 border-slate-300 text-center text-slate-900 font-bold text-xs">${somaMaqReal[m]}</td>
+                `;
+            }
+            footHtml += `
+                <td class="p-2 border-r border-slate-300 text-center text-blue-900 bg-blue-100/70 font-bold text-xs">${totalRealizado}</td>
+                <td class="p-2 text-center font-bold text-xs ${saldoAcumulado >= 0 ? 'text-emerald-800' : 'text-red-800'}">${saldoAcumulado > 0 ? '+' + saldoAcumulado : saldoAcumulado}</td>
+            `;
+            document.getElementById('rodape-tabela').innerHTML = footHtml;
+
+            const meta = estado.metaManual || 1;
+            const faltando = Math.max(0, meta - totalRealizado);
+            const pctConcluido = ((totalRealizado / meta) * 100).toFixed(1);
+
+            document.getElementById('dash-meta').innerText = meta.toLocaleString('pt-BR');
+            document.getElementById('dash-faltando').innerText = faltando === 0 ? 'META BATIDA! 🎉' : `Faltando: ${faltando} pares`;
+            document.getElementById('dash-realizado').innerText = totalRealizado.toLocaleString('pt-BR');
+            document.getElementById('dash-concluido').innerText = `${pctConcluido}% concluído`;
+            document.getElementById('dash-eficiencia').innerText = `${eficienciaProl.toFixed(1)}%`;
+            document.getElementById('dash-pessoas-ativas').innerText = `${pessoasAtivas} pessoas ativas`;
+
+            const elSaldo = document.getElementById('dash-saldo');
+            const elStatus = document.getElementById('dash-status-txt');
+            const cardStatus = document.getElementById('dash-card-status');
+            elSaldo.innerText = saldoAcumulado > 0 ? `+${saldoAcumulado}` : saldoAcumulado;
+
+            if (totalRealizado >= meta && meta > 0) {
+                cardStatus.className = 'bg-emerald-100 p-3 rounded-xl card-shadow border-2 border-emerald-500';
+                elSaldo.className = 'text-xl font-black text-emerald-700 mt-0.5';
+                elStatus.className = 'text-[11px] font-black text-emerald-800 block';
+                elStatus.innerText = '🏆 META BATIDA!';
+            } else if (saldoAcumulado < -11) {
+                cardStatus.className = 'bg-red-50 p-3 rounded-xl card-shadow border border-red-200';
+                elSaldo.className = 'text-xl font-black text-red-700 mt-0.5';
+                elStatus.className = 'text-[11px] font-bold text-red-700 block';
+                elStatus.innerText = 'REVEZAR !';
+            } else if (saldoAcumulado >= -10) {
+                cardStatus.className = 'bg-emerald-50 p-3 rounded-xl card-shadow border border-emerald-200';
+                elSaldo.className = 'text-xl font-black text-emerald-700 mt-0.5';
+                elStatus.className = 'text-[11px] font-bold text-emerald-700 block';
+                elStatus.innerText = 'ESTA BOM !';
+            } else {
+                cardStatus.className = 'bg-amber-50 p-3 rounded-xl card-shadow border border-amber-200';
+                elSaldo.className = 'text-xl font-black text-amber-700 mt-0.5';
+                elStatus.className = 'text-[11px] font-bold text-amber-700 block';
+                elStatus.innerText = 'ATENÇÃO !';
+            }
+
+            const banner = document.getElementById('banner-motivacional');
+            if (totalRealizado >= meta && meta > 0) {
+                banner.className = 'flex-grow bg-emerald-600 text-white text-center py-2.5 px-3 rounded-xl font-black text-xs sm:text-sm tracking-wider card-shadow border-2 border-emerald-400 animate-pulse';
+                banner.innerText = '🎉 META BATIDA! PARABÉNS EQUIPE! 🏆';
+                
+                if (!estado.metaJaComemorada) {
+                    estado.metaJaComemorada = true;
+                    dispararConfeteMetaBatida(totalRealizado);
+                }
+            } else {
+                estado.metaJaComemorada = false;
+                if (totalRealizado >= meta - 100 && meta > 100) {
+                    banner.className = 'flex-grow bg-blue-800 text-white text-center py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide card-shadow border border-blue-700';
+                    banner.innerText = 'PARABENIZE SUA EQUIPE, CHEGAMOS PERTO DO NOSSO OBJETIVO!!!';
+                } else {
+                    banner.className = 'flex-grow bg-slate-900 text-white text-center py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide card-shadow border border-slate-800';
+                    banner.innerText = 'MOTIVE A SUA EQUIPE PRA ALCANÇARMOS O OBJETIVO DE HOJE!!!';
+                }
+            }
+        }
+
+        function zerarTurno() {
+            estado.linhas.forEach(l => l.registros = Array(estado.qtdMaquinas).fill(null));
+            estado.metaJaComemorada = false;
+            recalcularTudo(false, true);
+            mostrarAviso('Lançamentos do turno zerados!');
+        }
+
+        function renderizarAbaOperadores() {
+            const container = document.getElementById('cards-operadores-container');
+            container.innerHTML = '';
+            
+            const selectMaq = document.getElementById('filtro-grafico-maq');
+            const valorSelecionado = selectMaq.value;
+            selectMaq.innerHTML = '<option value="todas">Todas as Máquinas</option>';
+
+            for (let m = 1; m <= estado.qtdMaquinas; m++) {
+                if (!estado.operadoresMaquinas[m]) {
+                    estado.operadoresMaquinas[m] = { op1: '', op2: '' };
+                }
+                const ops = estado.operadoresMaquinas[m];
+                const nomeDupla = (ops.op1 || ops.op2) ? `Maq ${m} (${ops.op1} & ${ops.op2})` : `Maq ${m}`;
+                
+                selectMaq.innerHTML += `<option value="${m}" ${valorSelecionado == m ? 'selected' : ''}>${nomeDupla}</option>`;
+
+                container.innerHTML += `
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-slate-900 text-xs sm:text-sm font-black">Maq ${m}</span>
+                            <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-semibold">2 Operadores</span>
+                        </div>
+                        <div class="space-y-1.5 text-xs">
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-0.5 text-[11px]">Operador 1</label>
+                                <input type="text" value="${ops.op1}" oninput="estado.operadoresMaquinas[${m}].op1 = this.value; atualizarSelectMaquinasTexto();" placeholder="Nome..." class="w-full p-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900 focus:outline-none text-xs">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-0.5 text-[11px]">Operador 2</label>
+                                <input type="text" value="${ops.op2}" oninput="estado.operadoresMaquinas[${m}].op2 = this.value; atualizarSelectMaquinasTexto();" placeholder="Nome..." class="w-full p-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900 focus:outline-none text-xs">
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            renderizarGraficoOperadores();
+        }
+
+        function atualizarSelectMaquinasTexto() {
+            const selectMaq = document.getElementById('filtro-grafico-maq');
+            const valorAtual = selectMaq.value;
+            selectMaq.innerHTML = '<option value="todas">Todas as Máquinas</option>';
+            for (let m = 1; m <= estado.qtdMaquinas; m++) {
+                const ops = estado.operadoresMaquinas[m] || { op1: '', op2: '' };
+                const nomeDupla = (ops.op1 || ops.op2) ? `Maq ${m} (${ops.op1} & ${ops.op2})` : `Maq ${m}`;
+                selectMaq.innerHTML += `<option value="${m}" ${valorAtual == m ? 'selected' : ''}>${nomeDupla}</option>`;
+            }
+        }
+
+        function salvarOperadores() {
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+            recalcularTudo(false, true);
+            mostrarAviso('Escala de operadores salva!');
+        }
+
+        function renderizarGraficoOperadores() {
+            const filtroMaq = document.getElementById('filtro-grafico-maq').value;
+            const labels = estado.linhas.map(l => l.hora);
+            
+            let datasetProducao = [];
+            let datasetMeta = [];
+
+            if (filtroMaq === 'todas') {
+                datasetProducao = estado.linhas.map(l => {
+                    let soma = 0;
+                    for (let m = 0; m < estado.qtdMaquinas; m++) {
+                        const reg = l.registros[m];
+                        if (reg !== null && reg !== undefined && reg !== '') {
+                            soma += reg / (estado.divisores[m] || 1);
+                        }
+                    }
+                    return soma;
+                });
+                datasetMeta = estado.linhas.map(() => estado.metaHoraLinha);
+            } else {
+                const mIdx = parseInt(filtroMaq) - 1;
+                datasetProducao = estado.linhas.map(l => {
+                    const reg = l.registros[mIdx];
+                    if (reg !== null && reg !== undefined && reg !== '') {
+                        return reg / (estado.divisores[mIdx] || 1);
+                    }
+                    return 0;
+                });
+                datasetMeta = estado.linhas.map(() => estado.metaHoraMaq);
+            }
+
+            const opsInfo = filtroMaq !== 'todas' ? estado.operadoresMaquinas[filtroMaq] : null;
+            const nomeLabel = opsInfo && (opsInfo.op1 || opsInfo.op2) ? `Produção (${opsInfo.op1} & ${opsInfo.op2})` : (filtroMaq === 'todas' ? 'Produção Realizada' : `Produção Maq ${filtroMaq}`);
+
+            const ctx = document.getElementById('graficoOperadoresMovimento').getContext('2d');
+            if (graficoOperadoresInstance) graficoOperadoresInstance.destroy();
+
+            graficoOperadoresInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: nomeLabel,
+                            data: datasetProducao,
+                            borderColor: '#059669',
+                            backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                            fill: true,
+                            tension: 0.2,
+                            borderWidth: 2.5,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#059669'
+                        },
+                        {
+                            label: 'Meta Referência',
+                            data: datasetMeta,
+                            borderColor: '#64748b',
+                            borderDash: [4, 4],
+                            tension: 0.1,
+                            borderWidth: 2,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { font: { size: 10, weight: 'bold' } } },
+                        x: { ticks: { font: { size: 10, weight: 'bold' } } }
+                    },
+                    plugins: { legend: { position: 'bottom', labels: { font: { size: 10, weight: 'bold' } } } }
+                }
+            });
+        }
+
+        function renderizarTabelaTempos() {
+            const filtro = (document.getElementById('busca-modelo').value || '').toLowerCase();
+            const tbody = document.getElementById('corpo-tabela-tempos');
+            tbody.innerHTML = '';
+
+            const chaves = Object.keys(bancoTempos).sort();
+            if (chaves.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400 font-semibold">Nenhum tempo cadastrado. Carregue o arquivo <code>tempos.json</code>.</td></tr>`;
+                return;
+            }
+
+            chaves.filter(m => m.toLowerCase().includes(filtro)).forEach(mod => {
+                const t = bancoTempos[mod];
+                const pares100 = t > 0 ? Math.round(60 / t) : 0;
+                const pares80 = Math.round(pares100 * 0.8);
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-2 font-bold text-slate-900 uppercase">${mod}</td>
+                        <td class="p-2 text-center font-mono font-bold text-blue-700">${t.toFixed(3)}</td>
+                        <td class="p-2 text-center text-slate-700">${pares100} p/h</td>
+                        <td class="p-2 text-center font-bold text-emerald-700">${pares80} p/h</td>
+                        <td class="p-2 text-right space-x-1">
+                            <button onclick="removerModeloTempo('${mod}')" class="text-[11px] bg-red-100 hover:bg-red-200 text-red-800 px-2 py-0.5 rounded font-semibold transition">Excluir</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function adicionarOuAtualizarModelo() {
+            const nome = document.getElementById('novo-modelo-nome').value.trim().toUpperCase();
+            const tempo = parseFloat(document.getElementById('novo-modelo-tempo').value);
+            if (!nome || isNaN(tempo) || tempo <= 0) return mostrarAviso('Informe nome e tempo válido.');
+            bancoTempos[nome] = tempo;
+            localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
+            document.getElementById('novo-modelo-nome').value = '';
+            document.getElementById('novo-modelo-tempo').value = '';
+            atualizarSelectsModelos();
+            renderizarTabelaTempos();
+            recalcularTudo(false, true);
+            mostrarAviso(`Modelo ${nome} salvo!`);
+        }
+
+        function removerModeloTempo(nome) {
+            delete bancoTempos[nome];
+            localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
+            atualizarSelectsModelos();
+            renderizarTabelaTempos();
+            recalcularTudo(false, true);
+            mostrarAviso(`Modelo ${nome} removido.`);
+        }
+
+        function salvarTurnoHistorico() {
+            const dataStr = document.getElementById('data-turno').value;
+            if (!dataStr) return mostrarAviso('Selecione uma data.');
+
+            let totalReal = 0, saldo = 0;
+            estado.linhas.forEach(l => {
+                let s = 0, tem = false;
+                for (let m = 0; m < estado.qtdMaquinas; m++) {
+                    if (l.registros[m] !== null && l.registros[m] !== undefined) {
+                        tem = true;
+                        s += l.registros[m] / (estado.divisores[m] || 1);
+                    }
+                }
+                if (tem) { totalReal += s; saldo += (s - estado.metaHoraLinha); }
+            });
+
+            const efTxt = document.getElementById('ef-card-prol').innerText;
+            const modelosUsados = estado.modelos.filter(m => m.vol > 0).map(m => `${m.nome} (${m.vol})`).join(', ') || '-';
+
+            let hist = JSON.parse(localStorage.getItem('app_historico_v12') || '[]');
+            const id = `${dataStr}_${estado.linha}`;
+            const reg = { id, data: dataStr, linha: estado.linha, modelos: modelosUsados, meta: estado.metaManual, realizado: totalReal, ef: efTxt, saldo, snapshot: JSON.parse(JSON.stringify(estado)) };
+            
+            const idx = hist.findIndex(x => x.id === id);
+            if (idx >= 0) hist[idx] = reg; else hist.push(reg);
+            hist.sort((a, b) => b.data.localeCompare(a.data));
+            localStorage.setItem('app_historico_v12', JSON.stringify(hist));
+            mostrarAviso('Turno salvo no histórico!');
+        }
+
+        function renderizarHistorico() {
+            const filtro = document.getElementById('filtro-periodo').value;
+            let hist = JSON.parse(localStorage.getItem('app_historico_v12') || '[]');
+            const hoje = new Date();
+
+            if (filtro === 'semana') {
+                const lim = new Date(); lim.setDate(hoje.getDate() - 7);
+                hist = hist.filter(x => new Date(x.data) >= lim);
+            } else if (filtro === 'mes') {
+                const mes = hoje.toISOString().slice(0, 7);
+                hist = hist.filter(x => x.data.startsWith(mes));
+            }
+
+            let somaPares = 0, somaEf = 0;
+            const tbody = document.getElementById('corpo-historico');
+            tbody.innerHTML = '';
+
+            hist.forEach(item => {
+                somaPares += item.realizado;
+                somaEf += parseFloat(item.ef) || 0;
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-2.5 font-semibold text-slate-900">${item.data.split('-').reverse().join('/')}</td>
+                        <td class="p-2.5 text-slate-800">${item.linha}</td>
+                        <td class="p-2.5 text-slate-600">${item.modelos}</td>
+                        <td class="p-2.5 text-center font-semibold text-slate-800">${item.meta}</td>
+                        <td class="p-2.5 text-center font-bold text-blue-600">${item.realizado}</td>
+                        <td class="p-2.5 text-center font-bold text-emerald-700">${item.ef}</td>
+                        <td class="p-2.5 text-center font-bold ${item.saldo >= 0 ? 'text-emerald-700' : 'text-red-700'}">${item.saldo > 0 ? '+' + item.saldo : item.saldo}</td>
+                        <td class="p-2.5 text-right space-x-1">
+                            <button onclick="abrirTurnoHistorico('${item.id}')" class="text-[11px] bg-blue-100 hover:bg-blue-200 text-blue-900 px-2 py-0.5 rounded font-semibold transition">Abrir</button>
+                            <button onclick="excluirTurnoHistorico('${item.id}')" class="text-[11px] bg-red-100 hover:bg-red-200 text-red-800 px-2 py-0.5 rounded font-semibold transition">X</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            if (hist.length === 0) tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-400 font-semibold">Nenhum registro.</td></tr>`;
+            document.getElementById('hist-total-pares').innerText = `${somaPares.toLocaleString('pt-BR')} pares`;
+            document.getElementById('hist-media-ef').innerText = hist.length ? `${(somaEf / hist.length).toFixed(1)}%` : '0.0%';
+            document.getElementById('hist-dias-count').innerText = hist.length;
+        }
+
+        function abrirTurnoHistorico(id) {
+            const hist = JSON.parse(localStorage.getItem('app_historico_v12') || '[]');
+            const item = hist.find(x => x.id === id);
+            if (!item || !item.snapshot) return;
+            estado = JSON.parse(JSON.stringify(item.snapshot));
+            document.getElementById('data-turno').value = item.data;
+            sincronizarCampos();
+            mudarAba('horahora');
+            recalcularTudo(false, true);
+        }
+
+        function excluirTurnoHistorico(id) {
+            let hist = JSON.parse(localStorage.getItem('app_historico_v12') || '[]').filter(x => x.id !== id);
+            localStorage.setItem('app_historico_v12', JSON.stringify(hist));
+            renderizarHistorico();
+            mostrarAviso('Registro excluído.');
+        }
+
+        async function salvarBackupGaveta() {
+            toggleGaveta(false);
+            const dadosBackup = {
+                tempos: bancoTempos,
+                historico: JSON.parse(localStorage.getItem('app_historico_v12') || '[]'),
+                estadoAtual: estado
+            };
+            const jsonStr = JSON.stringify(dadosBackup, null, 4);
+            const nomeArquivo = `backup_completo_${new Date().toISOString().slice(0,10)}.json`;
+
+            if (window.showSaveFilePicker) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: nomeArquivo,
+                        types: [{ description: 'Arquivo JSON', accept: { 'application/json': ['.json'] } }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(jsonStr);
+                    await writable.close();
+                    mostrarAviso('Backup salvo com sucesso!');
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                }
+            }
+
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = nomeArquivo;
+            a.click();
+            mostrarAviso('Backup salvo na pasta de downloads!');
+        }
+
+        function carregarBackupGaveta() {
+            toggleGaveta(false);
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    try {
+                        const conteudo = JSON.parse(ev.target.result);
+                        if (conteudo.tempos) {
+                            bancoTempos = conteudo.tempos;
+                            localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
+                        } else if (typeof conteudo === 'object' && !conteudo.historico && !conteudo.estadoAtual) {
+                            bancoTempos = conteudo;
+                            localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
+                        }
+                        if (conteudo.historico) localStorage.setItem('app_historico_v12', JSON.stringify(conteudo.historico));
+                        if (conteudo.estadoAtual) {
+                            estado = conteudo.estadoAtual;
+                            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+                        }
+                        atualizarSelectsModelos();
+                        sincronizarCampos();
+                        renderizarHistorico();
+                        recalcularTudo(false, true);
+                        mostrarAviso('Backup carregado com sucesso!');
+                    } catch (err) {
+                        mostrarAviso('Erro ao ler arquivo JSON.');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        function exportarBackupGeral() {
+            const dadosBackup = {
+                tempos: bancoTempos,
+                historico: JSON.parse(localStorage.getItem('app_historico_v12') || '[]'),
+                estadoAtual: estado
+            };
+            const blob = new Blob([JSON.stringify(dadosBackup, null, 4)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `backup_completo_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+        }
+
+        function importarBackupGeral(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                try {
+                    const conteudo = JSON.parse(ev.target.result);
+                    if (conteudo.tempos) {
+                        bancoTempos = conteudo.tempos;
+                        localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
+                    } else if (typeof conteudo === 'object' && !conteudo.historico && !conteudo.estadoAtual) {
+                        bancoTempos = conteudo;
+                        localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
+                    }
+                    if (conteudo.historico) localStorage.setItem('app_historico_v12', JSON.stringify(conteudo.historico));
+                    if (conteudo.estadoAtual) {
+                        estado = conteudo.estadoAtual;
+                        localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+                    }
+                    atualizarSelectsModelos();
+                    sincronizarCampos();
+                    renderizarHistorico();
+                    recalcularTudo(false, true);
+                    mostrarAviso('Backup carregado com sucesso!');
+                } catch (err) {
+                    mostrarAviso('Erro ao ler JSON.');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        const TITULOS_ABAS = {
+            horahora: 'QUADRO HORA-HORA',
+            eficiencia: 'CÁLCULO & EFICIÊNCIA',
+            operadores: 'OPERADORES & DESEMPENHO',
+            tempos: 'TABELA DE TEMPOS',
+            historico: 'HISTÓRICO & BACKUP'
+        };
+
+        function mudarAba(aba) {
+            ['horahora', 'eficiencia', 'operadores', 'tempos', 'historico'].forEach(nome => {
+                document.getElementById(`aba-${nome}`).classList.toggle('hidden', nome !== aba);
+                const btn = document.getElementById(`nav-${nome}`);
+                if (btn) {
+                    btn.className = nome === aba 
+                        ? 'w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white flex items-center gap-2.5 transition'
+                        : 'w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-800 flex items-center gap-2.5 transition';
+                }
+            });
+            document.getElementById('titulo-pagina-atual').innerText = TITULOS_ABAS[aba];
+            toggleGaveta(false);
+            if (aba === 'operadores') renderizarAbaOperadores();
+            if (aba === 'tempos') renderizarTabelaTempos();
+            if (aba === 'historico') renderizarHistorico();
+        }
+
+        function sincronizarCampos() {
+            document.getElementById('cfg-linha').value = estado.linha;
+            document.getElementById('cfg-mobra').value = estado.mobra;
+            document.getElementById('cfg-qmaq').value = estado.qtdMaquinas;
+            for (let i = 0; i < 3; i++) {
+                const sel = document.getElementById(`mod-${i+1}-nome`);
+                if (sel) sel.value = estado.modelos[i]?.nome || '';
+                const vol = document.getElementById(`mod-${i+1}-vol`);
+                if (vol) vol.value = estado.modelos[i]?.vol || 0;
+            }
+            document.getElementById('mo-treinando').value = estado.moAjustes.treinando;
+            document.getElementById('mo-afastado').value = estado.moAjustes.afastado;
+            document.getElementById('mo-ferias').value = estado.moAjustes.ferias;
+            document.getElementById('mo-faltas').value = estado.moAjustes.faltas;
+            document.getElementById('mo-emprestou').value = estado.moAjustes.emprestou;
+            document.getElementById('mo-recebeu').value = estado.moAjustes.recebeu;
+            document.getElementById('ef-tempo-turno').value = estado.moAjustes.tempoTurno;
+            
+            if (estado.dashboardOculto) {
+                document.getElementById('painel-recolhivel-completo').classList.add('hidden');
+                document.getElementById('btn-toggle-dash').innerHTML = '👁️ <span class="hidden sm:inline">Mostrar</span>';
+            }
+        }
+
+        atualizarSelectsModelos();
+        sincronizarCampos();
+        recalcularTudo(false, false);
+    </script>
+</body>
+</html>
