@@ -119,7 +119,7 @@
 
                 <div id="aviso-sem-tempos" class="hidden bg-amber-900/40 border border-amber-600/50 p-3 rounded-lg text-xs text-amber-200 space-y-2">
                     <p class="font-bold">⚠️ Nenhum tempo carregado!</p>
-                    <p>Vá em <b>Histórico & Backup</b> e clique em <b>Carregar Backup</b> para selecionar o arquivo <code>tempos.json</code> do seu celular.</p>
+                    <p>Vá em <b>Histórico & Backup</b> e clique em <b>Carregar Backup</b> ou use a calculadora na aba <b>Cálculo & Eficiência</b> para descobrir o tempo.</p>
                 </div>
 
                 <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 space-y-2">
@@ -354,6 +354,58 @@
                 </div>
             </section>
         </div>
+
+        <!-- NOVO CARD: DESCOBRIR TEMPO DO MODELO (ENGENHARIA REVERSA) -->
+        <section class="bg-white p-4 rounded-xl card-shadow border-2 border-blue-200 space-y-3">
+            <div class="flex flex-wrap justify-between items-center border-b border-slate-200 pb-2 gap-2">
+                <div>
+                    <h2 class="font-bold text-blue-900 text-xs sm:text-sm uppercase flex items-center gap-1.5">
+                        <span>🧮</span> 3. Descobrir Tempo do Modelo (Quando não sei o tempo)
+                    </h2>
+                    <p class="text-[11px] text-slate-500">Informe a quantidade de pessoas, o tempo do turno, os pares pedidos e a eficiência para descobrir o tempo unitário do modelo.</p>
+                </div>
+                <button onclick="puxarDadosAtuaisCalculadoraTempo()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition">
+                    🔄 Puxar Dados do Turno Atual
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-600 uppercase">Qtd. Pessoas</label>
+                    <input type="number" id="calc-tempo-pessoas" value="13" min="1" oninput="calcularTempoModeloReverso()" class="w-full mt-1 px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-900 text-center focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-600 uppercase">Tempo do Turno (min)</label>
+                    <input type="number" id="calc-tempo-turno" value="440" min="1" oninput="calcularTempoModeloReverso()" class="w-full mt-1 px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-900 text-center focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-600 uppercase">Pares Pedidos (Meta)</label>
+                    <input type="number" id="calc-tempo-pares" value="1008" min="1" oninput="calcularTempoModeloReverso()" class="w-full mt-1 px-2.5 py-2 bg-blue-50 border border-blue-300 rounded-lg font-bold text-blue-900 text-center focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-emerald-700 uppercase">Eficiência Calculada (%)</label>
+                    <input type="number" step="0.1" id="calc-tempo-eficiencia" value="80" min="1" oninput="calcularTempoModeloReverso()" class="w-full mt-1 px-2.5 py-2 bg-emerald-50 border border-emerald-300 rounded-lg font-bold text-emerald-900 text-center focus:outline-none focus:border-emerald-500">
+                </div>
+            </div>
+
+            <div class="bg-slate-900 text-white p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-3">
+                <div class="text-center sm:text-left">
+                    <span class="text-[11px] text-slate-400 uppercase font-bold block">Tempo Unitário Calculado do Modelo</span>
+                    <div class="flex items-baseline justify-center sm:justify-start gap-2 mt-0.5">
+                        <span id="resultado-tempo-descoberto" class="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">4.538</span>
+                        <span class="text-xs font-bold text-slate-300">minutos / par</span>
+                    </div>
+                    <span id="resultado-pares-hora-descoberto" class="text-[11px] text-amber-400 font-semibold block mt-0.5">Capacidade 100%: 13 pares/hora por pessoa</span>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <input type="text" id="nome-modelo-descoberto" placeholder="Nome do Modelo..." class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-bold uppercase text-white placeholder-slate-400 flex-grow sm:w-44 focus:outline-none focus:border-emerald-500">
+                    <button onclick="salvarTempoDescobertoNaTabela()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-lg text-xs font-bold transition shrink-0">
+                        + Salvar na Tabela
+                    </button>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- ABA 3: OPERADORES & DESEMPENHO -->
@@ -560,6 +612,65 @@
         function mostrarAviso(msg) {
             document.getElementById('modal-aviso-texto').innerText = msg;
             document.getElementById('modal-aviso').classList.remove('hidden');
+        }
+
+        // FUNÇÕES DA CALCULADORA REVERSA DE TEMPO DO MODELO
+        function puxarDadosAtuaisCalculadoraTempo() {
+            const pessoasAtivas = parseInt(document.getElementById('ef-mo-ativa').innerText) || estado.mobra || 13;
+            const tempoTurno = parseFloat(document.getElementById('ef-tempo-turno').value) || 440;
+            const paresMeta = parseFloat(document.getElementById('cfg-meta').value) || 1008;
+            const efAtual = parseFloat(document.getElementById('ef-card-prol').innerText) || 80;
+
+            document.getElementById('calc-tempo-pessoas').value = pessoasAtivas;
+            document.getElementById('calc-tempo-turno').value = tempoTurno;
+            document.getElementById('calc-tempo-pares').value = paresMeta;
+            document.getElementById('calc-tempo-eficiencia').value = efAtual > 0 ? efAtual.toFixed(1) : 80;
+
+            calcularTempoModeloReverso();
+        }
+
+        function calcularTempoModeloReverso() {
+            const pessoas = parseFloat(document.getElementById('calc-tempo-pessoas').value) || 0;
+            const tempoTurno = parseFloat(document.getElementById('calc-tempo-turno').value) || 0;
+            const pares = parseFloat(document.getElementById('calc-tempo-pares').value) || 0;
+            const eficiencia = parseFloat(document.getElementById('calc-tempo-eficiencia').value) || 0;
+
+            const elResultado = document.getElementById('resultado-tempo-descoberto');
+            const elCapHora = document.getElementById('resultado-pares-hora-descoberto');
+
+            if (pessoas > 0 && tempoTurno > 0 && pares > 0 && eficiencia > 0) {
+                const minutosDisponiveis = pessoas * tempoTurno;
+                const minutosNecessarios = (eficiencia / 100) * minutosDisponiveis;
+                const tempoModelo = minutosNecessarios / pares;
+
+                elResultado.innerText = tempoModelo.toFixed(3);
+                const paresHora100 = Math.round(60 / tempoModelo);
+                elCapHora.innerText = `Capacidade 100%: ${paresHora100} pares/hora por pessoa (Minutos totais: ${minutosNecessarios.toFixed(1)} min)`;
+            } else {
+                elResultado.innerText = '0.000';
+                elCapHora.innerText = 'Preencha todos os campos acima para calcular.';
+            }
+        }
+
+        function salvarTempoDescobertoNaTabela() {
+            const nome = document.getElementById('nome-modelo-descoberto').value.trim().toUpperCase();
+            const tempo = parseFloat(document.getElementById('resultado-tempo-descoberto').innerText);
+
+            if (!nome) {
+                return mostrarAviso('Digite o nome do modelo antes de salvar.');
+            }
+            if (isNaN(tempo) || tempo <= 0) {
+                return mostrarAviso('Calcule um tempo válido antes de salvar.');
+            }
+
+            bancoTempos[nome] = tempo;
+            localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
+            document.getElementById('nome-modelo-descoberto').value = '';
+            
+            atualizarSelectsModelos();
+            renderizarTabelaTempos();
+            recalcularTudo(false, true);
+            mostrarAviso(`Modelo ${nome} (${tempo.toFixed(3)} min) salvo na Tabela de Tempos!`);
         }
 
         let bancoTempos = JSON.parse(localStorage.getItem('app_tempos_db')) || {};
@@ -1183,7 +1294,7 @@
 
             const chaves = Object.keys(bancoTempos).sort();
             if (chaves.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400 font-semibold">Nenhum tempo cadastrado. Carregue o arquivo <code>tempos.json</code>.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400 font-semibold">Nenhum tempo cadastrado. Carregue o arquivo <code>tempos.json</code> ou use a calculadora na aba <b>Cálculo & Eficiência</b>.</td></tr>`;
                 return;
             }
 
@@ -1455,6 +1566,7 @@
             });
             document.getElementById('titulo-pagina-atual').innerText = TITULOS_ABAS[aba];
             toggleGaveta(false);
+            if (aba === 'eficiencia') puxarDadosAtuaisCalculadoraTempo();
             if (aba === 'operadores') renderizarAbaOperadores();
             if (aba === 'tempos') renderizarTabelaTempos();
             if (aba === 'historico') renderizarHistorico();
@@ -1487,6 +1599,7 @@
         atualizarSelectsModelos();
         sincronizarCampos();
         recalcularTudo(false, false);
+        puxarDadosAtuaisCalculadoraTempo();
     </script>
 </body>
 </html>
