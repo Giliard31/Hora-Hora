@@ -410,28 +410,58 @@
 
     <!-- ABA 3: OPERADORES & DESEMPENHO -->
     <main id="aba-operadores" class="hidden flex-grow w-full p-2 sm:p-4 space-y-4">
+        <!-- CARD ESCALA DE OPERADORES COM BOTÃO DE OCULTAR -->
         <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 space-y-3">
             <div class="flex flex-wrap justify-between items-center gap-2 border-b pb-2">
                 <div>
                     <h2 class="text-sm font-bold text-slate-900">Escala de Operadores</h2>
                     <p class="text-[11px] text-slate-500">Defina os 2 operadores de cada máquina.</p>
                 </div>
-                <button onclick="salvarOperadores()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
-                    💾 Salvar Escala
-                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="toggleSecaoOperadores()" id="btn-toggle-escala" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                        🔼 Ocultar Escala
+                    </button>
+                    <button onclick="salvarOperadores()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                        💾 Salvar Escala
+                    </button>
+                </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5" id="cards-operadores-container"></div>
+            <div id="container-escala-corpo" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5"></div>
         </div>
 
+        <!-- SEÇÃO DE GRÁFICOS E ACOMPANHAMENTO -->
         <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 space-y-3">
-            <div class="flex flex-wrap justify-between items-center gap-2">
-                <h2 class="text-sm font-bold text-slate-900">Gráfico de Desempenho Hora a Hora</h2>
-                <select id="filtro-grafico-maq" onchange="renderizarGraficoOperadores()" class="px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs font-semibold focus:outline-none">
-                    <option value="todas">Todas as Máquinas</option>
-                </select>
+            <div class="flex flex-wrap justify-between items-center gap-2 border-b pb-2">
+                <div>
+                    <h2 class="text-sm font-bold text-slate-900">Acompanhamento & Desempenho</h2>
+                    <p class="text-[11px] text-slate-500">Filtre por período, visualize a linha inteira ou cada máquina separadamente.</p>
+                </div>
+                
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- Filtro de Período -->
+                    <select id="filtro-periodo-op" onchange="renderizarGraficosOperadores()" class="px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded text-xs font-semibold focus:outline-none">
+                        <option value="7dias" selected>Últimos 7 Dias</option>
+                        <option value="mes">Mês Atual</option>
+                        <option value="todos">Todo o Histórico</option>
+                    </select>
+
+                    <!-- Filtro de Visualização: Todas juntas vs Separadas -->
+                    <select id="filtro-grafico-maq" onchange="renderizarGraficosOperadores()" class="px-2.5 py-1.5 bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold rounded text-xs focus:outline-none">
+                        <option value="todas">📊 Todas as 4 Máquinas (Unidas)</option>
+                        <option value="individual">📋 Ver as 4 Máquinas Separadas (Layout Individual)</option>
+                        <option value="1">Maq 1</option>
+                        <option value="2">Maq 2</option>
+                        <option value="3">Maq 3</option>
+                        <option value="4">Maq 4</option>
+                    </select>
+                </div>
             </div>
-            <div class="w-full h-64 sm:h-80">
-                <canvas id="graficoOperadoresMovimento"></canvas>
+
+            <!-- Container onde os gráficos vão aparecer dinamicamente -->
+            <div id="container-graficos-operadores" class="grid grid-cols-1 gap-4 pt-2">
+                <div class="w-full h-72 sm:h-80">
+                    <canvas id="graficoOperadoresMovimento"></canvas>
+                </div>
             </div>
         </div>
     </main>
@@ -685,6 +715,7 @@
             metaManual: 1008,
             dashboardOculto: false,
             metaJaComemorada: false,
+            escalaOculta: false,
             modelos: [
                 { nome: '', vol: 0 },
                 { nome: '', vol: 0 },
@@ -699,7 +730,7 @@
             }))
         };
 
-        let graficoOperadoresInstance = null;
+        let graficosOperadoresInstances = [];
         document.getElementById('data-turno').valueAsDate = new Date();
 
         function dispararConfeteMetaBatida(totalRealizado) {
@@ -755,6 +786,20 @@
                 painel.classList.remove('hidden');
                 btn.innerHTML = '👁️ <span class="hidden sm:inline">Ocultar</span>';
                 painel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+        }
+
+        function toggleSecaoOperadores() {
+            estado.escalaOculta = !estado.escalaOculta;
+            const corpo = document.getElementById('container-escala-corpo');
+            const btn = document.getElementById('btn-toggle-escala');
+            if (estado.escalaOculta) {
+                corpo.classList.add('hidden');
+                btn.innerHTML = '🔽 Mostrar Escala';
+            } else {
+                corpo.classList.remove('hidden');
+                btn.innerHTML = '🔼 Ocultar Escala';
             }
             localStorage.setItem('app_estado_v12', JSON.stringify(estado));
         }
@@ -1156,21 +1201,14 @@
         }
 
         function renderizarAbaOperadores() {
-            const container = document.getElementById('cards-operadores-container');
+            const container = document.getElementById('container-escala-corpo');
             container.innerHTML = '';
-            
-            const selectMaq = document.getElementById('filtro-grafico-maq');
-            const valorSelecionado = selectMaq.value;
-            selectMaq.innerHTML = '<option value="todas">Todas as Máquinas</option>';
 
             for (let m = 1; m <= estado.qtdMaquinas; m++) {
                 if (!estado.operadoresMaquinas[m]) {
                     estado.operadoresMaquinas[m] = { op1: '', op2: '' };
                 }
                 const ops = estado.operadoresMaquinas[m];
-                const nomeDupla = (ops.op1 || ops.op2) ? `Maq ${m} (${ops.op1} & ${ops.op2})` : `Maq ${m}`;
-                
-                selectMaq.innerHTML += `<option value="${m}" ${valorSelecionado == m ? 'selected' : ''}>${nomeDupla}</option>`;
 
                 container.innerHTML += `
                     <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
@@ -1181,28 +1219,26 @@
                         <div class="space-y-1.5 text-xs">
                             <div>
                                 <label class="block font-semibold text-slate-600 mb-0.5 text-[11px]">Operador 1</label>
-                                <input type="text" value="${ops.op1}" oninput="estado.operadoresMaquinas[${m}].op1 = this.value; atualizarSelectMaquinasTexto();" placeholder="Nome..." class="w-full p-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900 focus:outline-none text-xs">
+                                <input type="text" value="${ops.op1}" oninput="estado.operadoresMaquinas[${m}].op1 = this.value; renderizarGraficosOperadores();" placeholder="Nome..." class="w-full p-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900 focus:outline-none text-xs">
                             </div>
                             <div>
                                 <label class="block font-semibold text-slate-600 mb-0.5 text-[11px]">Operador 2</label>
-                                <input type="text" value="${ops.op2}" oninput="estado.operadoresMaquinas[${m}].op2 = this.value; atualizarSelectMaquinasTexto();" placeholder="Nome..." class="w-full p-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900 focus:outline-none text-xs">
+                                <input type="text" value="${ops.op2}" oninput="estado.operadoresMaquinas[${m}].op2 = this.value; renderizarGraficosOperadores();" placeholder="Nome..." class="w-full p-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900 focus:outline-none text-xs">
                             </div>
                         </div>
                     </div>
                 `;
             }
-            renderizarGraficoOperadores();
-        }
 
-        function atualizarSelectMaquinasTexto() {
-            const selectMaq = document.getElementById('filtro-grafico-maq');
-            const valorAtual = selectMaq.value;
-            selectMaq.innerHTML = '<option value="todas">Todas as Máquinas</option>';
-            for (let m = 1; m <= estado.qtdMaquinas; m++) {
-                const ops = estado.operadoresMaquinas[m] || { op1: '', op2: '' };
-                const nomeDupla = (ops.op1 || ops.op2) ? `Maq ${m} (${ops.op1} & ${ops.op2})` : `Maq ${m}`;
-                selectMaq.innerHTML += `<option value="${m}" ${valorAtual == m ? 'selected' : ''}>${nomeDupla}</option>`;
+            if (estado.escalaOculta) {
+                container.classList.add('hidden');
+                document.getElementById('btn-toggle-escala').innerHTML = '🔽 Mostrar Escala';
+            } else {
+                container.classList.remove('hidden');
+                document.getElementById('btn-toggle-escala').innerHTML = '🔼 Ocultar Escala';
             }
+
+            renderizarGraficosOperadores();
         }
 
         function salvarOperadores() {
@@ -1211,80 +1247,205 @@
             mostrarAviso('Escala de operadores salva!');
         }
 
-        function renderizarGraficoOperadores() {
-            const filtroMaq = document.getElementById('filtro-grafico-maq').value;
-            const labels = estado.linhas.map(l => l.hora);
-            
-            let datasetProducao = [];
-            let datasetMeta = [];
+        function obterHistoricoFiltradoPorPeriodo() {
+            const filtroPeriodo = document.getElementById('filtro-periodo-op').value;
+            let hist = JSON.parse(localStorage.getItem('app_historico_v12') || '[]');
+            const hoje = new Date();
 
-            if (filtroMaq === 'todas') {
-                datasetProducao = estado.linhas.map(l => {
-                    let soma = 0;
-                    for (let m = 0; m < estado.qtdMaquinas; m++) {
-                        const reg = l.registros[m];
-                        if (reg !== null && reg !== undefined && reg !== '') {
-                            soma += reg / (estado.divisores[m] || 1);
-                        }
+            if (filtroPeriodo === '7dias') {
+                const lim = new Date(); lim.setDate(hoje.getDate() - 7);
+                hist = hist.filter(x => new Date(x.data) >= lim);
+            } else if (filtroPeriodo === 'mes') {
+                const mes = hoje.toISOString().slice(0, 7);
+                hist = hist.filter(x => x.data.startsWith(mes));
+            }
+            // Ordenar por data crescente para o gráfico temporal
+            hist.sort((a, b) => a.data.localeCompare(b.data));
+            return hist;
+        }
+
+        function renderizarGraficosOperadores() {
+            // Destruir gráficos anteriores
+            graficosOperadoresInstances.forEach(g => g.destroy());
+            graficosOperadoresInstances = [];
+
+            const modoVisualizacao = document.getElementById('filtro-grafico-maq').value;
+            const containerGraficos = document.getElementById('container-graficos-operadores');
+            containerGraficos.innerHTML = '';
+
+            const historicoTurnos = obterHistoricoFiltradoPorPeriodo();
+
+            if (modoVisualizacao === 'todas') {
+                // Gráfico unificado da linha inteira ao longo dos dias do período
+                containerGraficos.innerHTML = `<div class="w-full h-72 sm:h-80"><canvas id="graficoUnificadoOp"></canvas></div>`;
+                
+                const labels = historicoTurnos.map(t => t.data.split('-').reverse().join('/'));
+                const dadosProducao = historicoTurnos.map(t => t.realizado);
+                const dadosMeta = historicoTurnos.map(t => t.meta);
+
+                const ctx = document.getElementById('graficoUnificadoOp').getContext('2d');
+                const inst = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels.length ? labels : ['Hoje (Turno Atual)'],
+                        datasets: [
+                            {
+                                label: 'Produção Realizada (Total Linha)',
+                                data: dadosProducao.length ? dadosProducao : [0],
+                                borderColor: '#059669',
+                                backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                                fill: true,
+                                tension: 0.2,
+                                borderWidth: 2.5,
+                                pointRadius: 4,
+                                pointBackgroundColor: '#059669'
+                            },
+                            {
+                                label: 'Meta Geral',
+                                data: dadosMeta.length ? dadosMeta : [estado.metaManual],
+                                borderColor: '#64748b',
+                                borderDash: [4, 4],
+                                tension: 0.1,
+                                borderWidth: 2,
+                                pointRadius: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { y: { beginAtZero: true, ticks: { font: { size: 10, weight: 'bold' } } }, x: { ticks: { font: { size: 10, weight: 'bold' } } } },
+                        plugins: { legend: { position: 'bottom', labels: { font: { size: 10, weight: 'bold' } } } }
                     }
-                    return soma;
                 });
-                datasetMeta = estado.linhas.map(() => estado.metaHoraLinha);
+                graficosOperadoresInstances.push(inst);
+
+            } else if (modoVisualizacao === 'individual') {
+                // Layout com os 4 gráficos individuais das 4 máquinas lado a lado / empilhados
+                let htmlCards = '';
+                for (let m = 1; m <= 4; m++) {
+                    const ops = estado.operadoresMaquinas[m] || { op1: '', op2: '' };
+                    const nomeDupla = (ops.op1 || ops.op2) ? `Máquina ${m} (${ops.op1} & ${ops.op2})` : `Máquina ${m}`;
+                    htmlCards += `
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                            <h3 class="text-xs font-black text-slate-800 uppercase">${nomeDupla}</h3>
+                            <div class="w-full h-56">
+                                <canvas id="graficoMaqInd_${m}"></canvas>
+                            </div>
+                        </div>
+                    `;
+                }
+                containerGraficos.className = "grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2";
+                containerGraficos.innerHTML = htmlCards;
+
+                // Renderizar cada gráfico de máquina
+                for (let m = 1; m <= 4; m++) {
+                    const canvasEl = document.getElementById(`graficoMaqInd_${m}`);
+                    if (!canvasEl) continue;
+
+                    // Extrair dados da máquina m do histórico ou do turno atual
+                    const labels = historicoTurnos.map(t => t.data.split('-').reverse().join('/'));
+                    const dadosMaq = historicoTurnos.map(t => {
+                        // Se houver snapshot salvo no histórico, recupera o valor da máquina
+                        if (t.snapshot && t.snapshot.linhas) {
+                            let somaMaq = 0;
+                            t.snapshot.linhas.forEach(l => {
+                                const reg = l.registros[m-1];
+                                if (reg !== null && reg !== undefined) {
+                                    somaMaq += reg / (t.snapshot.divisores[m-1] || 1);
+                                }
+                            });
+                            return somaMaq;
+                        }
+                        return 0;
+                    });
+
+                    const ctx = canvasEl.getContext('2d');
+                    const inst = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels.length ? labels : ['Sem histórico'],
+                            datasets: [{
+                                label: `Produção Maq ${m}`,
+                                data: dadosMaq.length ? dadosMaq : [0],
+                                borderColor: '#2563eb',
+                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                fill: true,
+                                tension: 0.2,
+                                borderWidth: 2,
+                                pointRadius: 3
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: { y: { beginAtZero: true, ticks: { font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } },
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                    graficosOperadoresInstances.push(inst);
+                }
+
             } else {
-                const mIdx = parseInt(filtroMaq) - 1;
-                datasetProducao = estado.linhas.map(l => {
-                    const reg = l.registros[mIdx];
-                    if (reg !== null && reg !== undefined && reg !== '') {
-                        return reg / (estado.divisores[mIdx] || 1);
+                // Máquina específica selecionada (1, 2, 3 ou 4)
+                containerGraficos.className = "grid grid-cols-1 gap-4 pt-2";
+                containerGraficos.innerHTML = `<div class="w-full h-72 sm:h-80"><canvas id="graficoMaqUnica"></canvas></div>`;
+
+                const mIdx = parseInt(modoVisualizacao);
+                const ops = estado.operadoresMaquinas[mIdx] || { op1: '', op2: '' };
+                const nomeLabel = (ops.op1 || ops.op2) ? `Máquina ${mIdx} (${ops.op1} & ${ops.op2})` : `Máquina ${mIdx}`;
+
+                const labels = historicoTurnos.map(t => t.data.split('-').reverse().join('/'));
+                const dadosMaq = historicoTurnos.map(t => {
+                    if (t.snapshot && t.snapshot.linhas) {
+                        let somaMaq = 0;
+                        t.snapshot.linhas.forEach(l => {
+                            const reg = l.registros[mIdx-1];
+                            if (reg !== null && reg !== undefined) {
+                                somaMaq += reg / (t.snapshot.divisores[mIdx-1] || 1);
+                            }
+                        });
+                        return somaMaq;
                     }
                     return 0;
                 });
-                datasetMeta = estado.linhas.map(() => estado.metaHoraMaq);
-            }
 
-            const opsInfo = filtroMaq !== 'todas' ? estado.operadoresMaquinas[filtroMaq] : null;
-            const nomeLabel = opsInfo && (opsInfo.op1 || opsInfo.op2) ? `Produção (${opsInfo.op1} & ${opsInfo.op2})` : (filtroMaq === 'todas' ? 'Produção Realizada' : `Produção Maq ${filtroMaq}`);
-
-            const ctx = document.getElementById('graficoOperadoresMovimento').getContext('2d');
-            if (graficoOperadoresInstance) graficoOperadoresInstance.destroy();
-
-            graficoOperadoresInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: nomeLabel,
-                            data: datasetProducao,
-                            borderColor: '#059669',
-                            backgroundColor: 'rgba(5, 150, 105, 0.1)',
-                            fill: true,
-                            tension: 0.2,
-                            borderWidth: 2.5,
-                            pointRadius: 4,
-                            pointBackgroundColor: '#059669'
-                        },
-                        {
-                            label: 'Meta Referência',
-                            data: datasetMeta,
-                            borderColor: '#64748b',
-                            borderDash: [4, 4],
-                            tension: 0.1,
-                            borderWidth: 2,
-                            pointRadius: 0
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: { beginAtZero: true, ticks: { font: { size: 10, weight: 'bold' } } },
-                        x: { ticks: { font: { size: 10, weight: 'bold' } } }
+                const ctx = document.getElementById('graficoMaqUnica').getContext('2d');
+                const inst = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels.length ? labels : ['Sem histórico'],
+                        datasets: [
+                            {
+                                label: nomeLabel,
+                                data: dadosMaq.length ? dadosMaq : [0],
+                                borderColor: '#059669',
+                                backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                                fill: true,
+                                tension: 0.2,
+                                borderWidth: 2.5,
+                                pointRadius: 4,
+                                pointBackgroundColor: '#059669'
+                            },
+                            {
+                                label: 'Meta Referência Máquina',
+                                data: labels.map(() => estado.metaHoraMaq * 7), // Estimativa de turno
+                                borderColor: '#64748b',
+                                borderDash: [4, 4],
+                                borderWidth: 2,
+                                pointRadius: 0
+                            }
+                        ]
                     },
-                    plugins: { legend: { position: 'bottom', labels: { font: { size: 10, weight: 'bold' } } } }
-                }
-            });
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { y: { beginAtZero: true, ticks: { font: { size: 10, weight: 'bold' } } }, x: { ticks: { font: { size: 10, weight: 'bold' } } } },
+                        plugins: { legend: { position: 'bottom', labels: { font: { size: 10, weight: 'bold' } } } }
+                    }
+                });
+                graficosOperadoresInstances.push(inst);
+            }
         }
 
         function renderizarTabelaTempos() {
